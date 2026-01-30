@@ -5,7 +5,7 @@ import json
 import os
 
 app = Flask(__name__)
-# Use your verified Bot Token
+# Your Bot Token
 bot = telebot.TeleBot("8558560055:AAE3_3XmN4VK-iwrwD8BLeL8i-1_LHF9_mM")
 
 @app.route('/api/bot', methods=['POST'])
@@ -20,39 +20,42 @@ def webhook():
 @bot.message_handler(func=lambda message: True)
 def handle_view_request(message):
     try:
-        # 1. FIX PATH: Find LICENSE.json in the root folder
-        base_path = os.path.dirname(os.path.abspath(__file__))
-        lic_path = os.path.join(base_path, '..', 'LICENSE.json')
-        
+        # Use absolute path to find the license file on Vercel
+        lic_path = os.path.join(os.getcwd(), 'LICENSE.json')
+        if not os.path.exists(lic_path):
+             bot.reply_to(message, "❌ Error: LICENSE.json not found in root.")
+             return
+
         with open(lic_path, 'r') as f:
             lic = json.load(f)
         
-        # 2. OWNER CHECK: Ensure the IDs match exactly
+        # Security check: Make sure this is YOUR Telegram ID
         if str(message.from_user.id) != str(lic.get("owner_id")):
-            bot.reply_to(message, f"❌ Unauthorized. Your ID: {message.from_user.id}")
+            bot.reply_to(message, f"❌ Unauthorized ID: {message.from_user.id}")
             return
 
-        # 3. INPUT CHECK
-        msg_text = message.text.split()
-        if not msg_text[0].startswith("http"):
-            bot.reply_to(message, "Send a valid Instagram URL.")
+        # Basic input check
+        msg_parts = message.text.split()
+        if not msg_parts[0].startswith("http"):
+            bot.reply_to(message, "Please send a valid Instagram URL.")
             return
 
-        # 4. SEND SINGLE REQUEST: Prevents 10s Vercel Timeout
+        # Single request only to avoid Vercel 10s timeout
         url = "https://indianbestsmm.com/insta.php"
         headers = {
             'User-Agent': "Mozilla/5.0 (Linux; Android 10)",
             'Cookie': "PHPSESSID=644c9fa32cb89d43c74c37d97c2d7f16"
         }
         
-        bot.send_message(message.chat.id, "🚀 Processing one request...")
-        response = requests.post(url, data={'user_link': msg_text[0]}, headers=headers, timeout=5)
+        payload = {'user_link': msg_parts[0]}
+        # Set a short timeout for the SMM request itself
+        response = requests.post(url, data=payload, headers=headers, timeout=5)
         
-        bot.reply_to(message, f"✅ Done! Server responded with: {response.status_code}")
+        bot.reply_to(message, f"✅ Request sent! Status: {response.status_code}")
 
     except Exception as e:
-        # This will tell you the EXACT error in Telegram
-        bot.reply_to(message, f"⚠️ Error: {str(e)}")
+        # This will send the exact error to your Telegram instead of crashing
+        bot.reply_to(message, f"⚠️ Script Error: {str(e)}")
 
 if name == "__main__":
     app.run()
